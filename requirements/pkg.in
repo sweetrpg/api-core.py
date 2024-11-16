@@ -1,0 +1,6 @@
+# TODO: don't forget to update setup.py
+sweetrpg-model-core
+sweetrpg-common
+sweetrpg-db
+opentelemetry-api
+opentelemetry-sdk

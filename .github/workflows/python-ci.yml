@@ -1,0 +1,172 @@
+name: CI
+
+concurrency: python-ci
+
+on:
+    push:
+        branches: [develop]
+        paths:
+            - "src/**"
+            - "tests/**"
+            - setup.cfg
+            - setup.py
+            - tox.ini
+            - "requirements/*.txt"
+            - "docs/**"
+    workflow_run:
+        workflows: ["Update Requirements"]
+        types: [completed]
+    workflow_dispatch:
+
+jobs:
+    tests:
+        name: ${{ matrix.name }}
+        runs-on: ${{ matrix.os }}
+        concurrency: ci
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: Linux
+                      os: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+            - name: Get language version
+              id: get_lang_version
+              run: |
+                    v=$(cat .python-version)
+                    echo "lang_version=$v" >> $GITHUB_OUTPUT
+                    t=$(cat .tox-env)
+                    echo "tox_env=$t" >> $GITHUB_OUTPUT
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ steps.get_lang_version.outputs.lang_version }}
+            - name: update-pip
+              run: |
+                    pip install -U wheel
+                    pip install -U setuptools
+                    python -m pip install -U pip
+            - name: get-pip-cache-dir
+              id: pip-cache
+              run: echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+            - name: cache-pip
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.pip-cache.outputs.dir }}
+                  key: pip|${{ runner.os }}|${{ steps.get_lang_version.outputs.lang_version }}|${{ hashFiles('setup.py') }}|${{ hashFiles('requirements/*.txt') }}
+            - name: install-utils
+              run: pip install tox
+            - name: setup-env
+              env:
+                  MONGODB_URI: "mongodb://localhost:27017/unit-tests"
+              run: |
+                    printenv > tests/.env
+            - name: start-mongodb
+              uses: supercharge/mongodb-github-action@1.6.0
+              with:
+                  mongodb-version: "7.0"
+            - name: tests
+              run: |
+                    tox -e ${{ steps.get_lang_version.outputs.tox_env }}
+
+    docs:
+        needs: [tests]
+        runs-on: ubuntu-latest
+        concurrency: docs
+        steps:
+            - uses: actions/checkout@v4
+            - name: Get language version
+              id: get_lang_version
+              run: |
+                    v=$(cat .python-version)
+                    echo "lang_version=$v" >> $GITHUB_OUTPUT
+                    t=$(cat .tox-env)
+                    echo "tox_env=$t" >> $GITHUB_OUTPUT
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ steps.get_lang_version.outputs.lang_version }}
+            - name: install-deps
+              run: pip install -r requirements/docs.txt
+            - name: make-docs
+              run: cd docs && make html
+            - name: publish-docs
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./docs/_build/html
+                  destination_dir: python
+
+    publish:
+        needs: [tests]
+        runs-on: ubuntu-latest
+        concurrency: publish
+        permissions:
+            id-token: write
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+            # - name: Build a binary wheel and a source tarball
+            #   run: |
+            #         python3 -m pip install build --user
+            #         python3 -m build
+            # - name: Store the distribution packages
+            #   uses: actions/upload-artifact@v4
+            #   with:
+            #     name: python-package-distributions
+            #     path: dist/
+            # - name: publish
+            #   uses: pypa/gh-action-pypi-publish@release/v1
+            - name: publish
+              uses: relekang/python-semantic-release@v7.34.6
+              with:
+                additional_options: "--patch"
+                github_token: ${{ secrets.GITHUB_TOKEN }}
+                repository_username: __token__
+                repository_password: ${{ secrets.PYPI_TOKEN }}
+
+    notify:
+        needs: [publish]
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - repo: api-core.py
+                    - repo: catalog-api
+                    - repo: catalog-data.py
+                    - repo: catalog-data-processor
+                    - repo: catalog-objects.py
+                    - repo: catalog-web
+                    - repo: client.py
+                    - repo: data-api
+                    - repo: data-objects.py
+                    - repo: db.py
+                    - repo: initiative-api
+                    - repo: initiative-data.py
+                    - repo: initiative-objects.py
+                    - repo: initiative-web
+                    - repo: kv-api
+                    - repo: kv-data.py
+                    - repo: kv-expression-processor
+                    - repo: kv-key-processor
+                    - repo: kv-objects.py
+                    - repo: kv-value-calculator
+                    - repo: kv-web
+                    - repo: library-api
+                    - repo: library-data.py
+                    - repo: library-objects.py
+                    - repo: library-web
+                    - repo: main-web
+                    - repo: model-core.py
+                    - repo: shared-web
+                    - repo: web-core.py
+        steps:
+            - uses: juztcode/repo-ditpatch-action@v1
+              continue-on-error: true
+              with:
+                event-type: api-core-published
+                token: ${{ secrets.REPO_ACCESS_TOKEN }}
+                repository: sweetrpg/${{ matrix.repo }}
