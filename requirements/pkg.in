@@ -4,3 +4,4 @@ sweetrpg-common
 sweetrpg-db
 opentelemetry-api
 opentelemetry-sdk
+flask
