@@ -13,6 +13,7 @@ on:
             - tox.ini
             - "requirements/*.txt"
             - "docs/**"
+            - ".github/workflows/**"
     workflow_run:
         workflows: ["Update Requirements"]
         types: [completed]
