@@ -7,6 +7,7 @@ setup(
         "sweetrpg-model-core",
         "sweetrpg-db",
         "sweetrpg-common",
+        "flask",
     ],
     extras_require={},
 )
