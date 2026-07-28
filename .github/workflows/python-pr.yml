@@ -55,3 +55,21 @@ jobs:
             #   run: black --check -t ${{ steps.get_lang_version.outputs.tox_env }} --diff --color src
             - name: tests
               run: tox -e ${{ steps.get_lang_version.outputs.tox_env }}
+            - name: coverage-summary
+              run: |
+                  echo "## Python coverage" >> "$GITHUB_STEP_SUMMARY"
+                  echo '```' >> "$GITHUB_STEP_SUMMARY"
+                  tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage report -m >> "$GITHUB_STEP_SUMMARY"
+                  echo '```' >> "$GITHUB_STEP_SUMMARY"
+                  tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage xml
+                  tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage html
+            - name: upload-coverage-artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report-${{ matrix.name }}
+                  path: |
+                      htmlcov/
+                      coverage.xml
+            - name: coverage-threshold
+              continue-on-error: true
+              run: tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage report --fail-under=0
