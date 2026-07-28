@@ -22,7 +22,9 @@ jobs:
     tests:
         name: ${{ matrix.name }}
         runs-on: ${{ matrix.os }}
-        concurrency: ci
+        permissions:
+            contents: write
+        concurrency: ci-${{ github.ref }}
         strategy:
             fail-fast: false
             matrix:
@@ -69,6 +71,43 @@ jobs:
             - name: tests
               run: |
                     tox -e ${{ steps.get_lang_version.outputs.tox_env }}
+            - name: coverage-summary
+              run: |
+                    echo "## Python coverage" >> "$GITHUB_STEP_SUMMARY"
+                    echo '```' >> "$GITHUB_STEP_SUMMARY"
+                    tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage report -m >> "$GITHUB_STEP_SUMMARY"
+                    echo '```' >> "$GITHUB_STEP_SUMMARY"
+                    mkdir -p coverage-pages
+                    tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage xml -o coverage-pages/coverage.xml
+                    tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage html -d coverage-pages/htmlcov
+            - name: upload-coverage-artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report-${{ matrix.name }}
+                  path: coverage-pages/
+            # Warn-only: continue-on-error means this never blocks the job, only shows
+            # as a flagged step.
+            - name: coverage-threshold
+              continue-on-error: true
+              run: tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage report --fail-under=0
+            # Written alongside the HTML/XML report so the publish step below carries it
+            # to GitHub Pages - avoids committing to the source branch.
+            - name: coverage-badge
+              continue-on-error: true
+              run: |
+                    PCT=$(tox exec -e ${{ steps.get_lang_version.outputs.tox_env }} -- coverage report --format=total | grep -E '^[0-9]+$' | tail -1)
+                    COLOR=$(awk -v p="$PCT" 'BEGIN { if (p>=80) print "brightgreen"; else if (p>=50) print "yellow"; else print "red" }')
+                    printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' \
+                        "$PCT" "$COLOR" > coverage-pages/coverage-badge.json
+            # keep_files: true - a root-level publish (no destination_dir) otherwise wipes
+            # the whole branch by default, which would delete the docs job's /python/
+            # subfolder from a previous run.
+            - name: publish-coverage
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./coverage-pages
+                  keep_files: true
 
     docs:
         needs: [tests]
