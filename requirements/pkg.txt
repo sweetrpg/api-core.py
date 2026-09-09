@@ -46,6 +46,8 @@ pymongo[srv]==3.13.0
     #   pymongo
     #   sweetrpg-db
     #   sweetrpg-model-core
+redis==8.1.0
+    # via -r requirements/pkg.in
 sweetrpg-common==0.0.1
     # via -r requirements/pkg.in
 sweetrpg-db==0.0.145

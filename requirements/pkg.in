@@ -5,3 +5,4 @@ sweetrpg-db
 opentelemetry-api
 opentelemetry-sdk
 flask
+redis

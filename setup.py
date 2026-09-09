@@ -8,6 +8,7 @@ setup(
         "sweetrpg-db",
         "sweetrpg-common",
         "flask",
+        "redis",
     ],
     extras_require={},
 )

@@ -29,6 +29,8 @@ dnspython==2.8.0
     #   -r requirements/tests.in
     #   pymongo
     #   sweetrpg-db
+fakeredis==2.38.0
+    # via -r requirements/tests.in
 filelock==3.32.0
     # via
     #   python-discovery
@@ -105,6 +107,12 @@ python-discovery==1.5.0
     #   virtualenv
 python-dotenv==1.2.2
     # via -r requirements/tests.in
+redis==8.1.0
+    # via
+    #   -r requirements/pkg.in
+    #   fakeredis
+sortedcontainers==2.4.0
+    # via fakeredis
 sweetrpg-common==0.0.1
     # via -r requirements/pkg.in
 sweetrpg-db==0.0.145
